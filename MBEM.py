@@ -10,6 +10,7 @@ from random import shuffle
 
 from functions import generate_workers, generate_labels_weight, majority_voting, post_prob_DS
 from resnet import train, max_val_epoch
+import matplotlib.pyplot as plt
 
 # Downloading data for CIFAR10
 # The following function downloads .rec iterator and .lst files (MXNET iterators) for CIFAR10 
@@ -77,7 +78,8 @@ def main(fname,n,n1,k,conf,samples,repeat,epochs,depth,gpus):
     # it prints the generalization error of the trained model.
     _, val_acc = call_train(n,samples,k,pred_mv,workers_val_label,fname,epochs,depth,gpus)
     print "generalization_error:  " + str(val_acc)
-    
+    mv_acc = val_acc
+
     print "Algorithm: weighted majority vote:\t", 
     # running the another baseline algorithm where the aggregation is performed using the weighted majority vote
     # creating a numpy array to store weighted majority vote labels
@@ -90,6 +92,7 @@ def main(fname,n,n1,k,conf,samples,repeat,epochs,depth,gpus):
     # returns model prediction on the training examples, which is being stored in the variable "naive_pred".
     naive_pred, val_acc = call_train(n,samples,k,naive_agg[valid],workers_val_label,fname,epochs,depth,gpus)
     print "generalization_error:  " + str(val_acc)
+    wmv_acc = val_acc
 
     print "Algorithm: MBEM:\t\t\t",    
     # running the proposed algorithm "MBEM: model bootstrapped expectation maximization" 
@@ -103,6 +106,8 @@ def main(fname,n,n1,k,conf,samples,repeat,epochs,depth,gpus):
     # examples given the model prediction obtained using the "weighted majority vote" algorithm.
     _, val_acc = call_train(n,samples,k,algo_agg[valid],workers_val_label,fname,epochs,depth,gpus)
     print "generalization_error:  " + str(val_acc)
+    mbem_acc = val_acc
+    return mv_acc, wmv_acc, mbem_acc
     
 def call_train(n,samples,k,workers_train_label_use,workers_val_label,fname,epochs,depth,gpus):
     # this function takes as input aggregated labels of the training examples
@@ -148,7 +153,19 @@ conf = generate_workers(m,k,gamma,class_wise)
 # it prints the generalization error of the model on set aside test data
 # note that the samples*repeat is approximately same for each pair
 # which implies that the total annotation budget is fixed.
-for repeat,samples in [[13,4000],[7,7000],[5,10000],[3,17000],[1,50000]]: 
+mv_his = []
+wmv_his = []
+mbem_his = []
+for repeat,samples in [[10,5000],[7,7000],[6,8000],[5,10000],[4,12500],[3,17000],[2,25000],[1,50000]]: 
     print "\nnumber of training examples: " + str(samples) + "\t redundancy: " + str(repeat)
     # calling the main function
-    main(fname,n,n1,k,conf,samples,repeat,epochs,depth,gpus)
+    mv_acc, wmv_acc, mbem_acc = main(fname,n,n1,k,conf,samples,repeat,epochs,depth,gpus)
+    mv_his.append(mv_acc)
+    wmv_his.append(wmv_acc)
+    mbem_acc.append(mbem_acc)
+
+plt.plot([1,2,3,4,5,6,7,10],mv_his[::-1], label = 'mv')
+plt.plot([1,2,3,4,5,6,7,10],wmv_his[::-1], label = 'wmv')
+plt.plot([1,2,3,4,5,6,7,10],mbem_his[::-1], label = 'mbmv')
+plt.legend()
+plt.savefig()
