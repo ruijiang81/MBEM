@@ -21,7 +21,9 @@ def generate_workers(m,k,gamma,class_wise):
         if(class_wise==0):
             #letting the confusion matrix to be identity with probability gamma 
             if(np.random.uniform(0,1) < gamma):
-                conf[i] = np.identity(k)
+                #conf[i] = np.identity(k)
+                conf[i] = conf[i]+np.identity(k)*np.random.uniform(3,4) 
+                conf[i] = np.divide(conf[i],np.outer(np.sum(conf[i],axis =1),np.ones(k)))
             # To avoid numerical issues changing the spammer matrix each element slightly    
             else:
                 conf[i] = conf[i] + 0.01*np.identity(k)
