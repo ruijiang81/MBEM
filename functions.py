@@ -4,28 +4,52 @@ import numpy as np
 import logging,os
 import copy
 import urllib
+from scipy import special
 import logging,os,sys
 from scipy import stats
 from random import shuffle
 
-def generate_workers(m,k,gamma,class_wise):
+def price_accuracy(price, setting, fixp = 0.85, linear_min = 0.6, linear_max = 0.8):
+    # generate underlying probability under various price setting
+    # Fix, Concave, Aysmptotic, Linear, Ceiling
+    setting = setting.lower()
+    assert setting in ['fix', 'concave', 'aysmptotic', 'linear', 'ceiling'], "unknown setting"
+    if setting == 'fix':
+        return fixp
+    if setting == 'concave':
+        return 0.48 + 0.066 * (100 * price) - 0.0022 * (100 * price) ** 2
+    if setting == 'aysmptotic':
+        return 1 - 1./(100 * price)
+    if setting == 'linear':
+        return (linear_max - linear_min)/(0.25 - 0.02) * price  + (linear_min - 0.02 * (linear_max - linear_min)/(0.25 - 0.02))
+
+
+def generate_workers(m,k,gamma,class_wise, price_setting = False, p_setting = 'fix', price = 0.02, fixp = 0.85, linear_min = 0.6, linear_max = 0.8):
     # Generating worker confusion matrices according to class-wise hammer-spammer distribution if class_wise ==1
     # Generating worker confusion matrices according to hammer-spammer distribution if class_wise ==0    
     # One row for each true class and columns for given answers
     
-    #iniializing confusion matrices with all entries being equal to 1/k that is corresponding to a spammer worker.
+    #initializing confusion matrices with all entries being equal to 1/k that is corresponding to a spammer worker.
     conf = (1/float(k))*np.ones((m,k,k))
+
+    if price_setting:
+        accuracy = price_accuracy(price, p_setting, fixp, linear_min, linear_max)
     # a loop to generate confusion matrix for each worker 
     for i in range(m): 
         # if class_wise ==0 then generating worker confusion matrix according to hammer-spammer distribution
         if(class_wise==0):
             #letting the confusion matrix to be identity with probability gamma 
+
             if(np.random.uniform(0,1) < gamma):
                 #original 
                 #conf[i] = np.identity(k)
                 #drop prob of perfect worker a little  
-                conf[i] = conf[i]+np.identity(k)*np.random.uniform(3,4) 
-                conf[i] = np.divide(conf[i],np.outer(np.sum(conf[i],axis =1),np.ones(k)))
+                if price_setting:
+                    conf[i] = conf[i]+np.identity(k) * (1/float(K) - accuracy)/(accuracy - 1) 
+                    conf[i] = np.divide(conf[i],np.outer(np.sum(conf[i],axis =1),np.ones(k)))
+                else:    
+                    conf[i] = conf[i]+np.identity(k) 
+                    conf[i] = np.divide(conf[i],np.outer(np.sum(conf[i],axis =1),np.ones(k)))
                 #beta distribution 
                 #conf[i] = conf[i]+np.identity(k)*np.random.beta(2,0.5)
                 #conf[i] = np.divide(conf[i],np.outer(np.sum(conf[i],axis =1),np.ones(k)))
@@ -167,3 +191,32 @@ def post_prob_DS(resp_org,e_class,workers_this_example):
         temp_class[i] = np.divide(temp_class[i],np.outer(np.sum(temp_class[i]),np.ones(k)))
         e_class[i] = temp_class[i]           
     return e_class
+
+def estimate(price_level, setting, B, m = 10, k = 10, gamma = 1, classwise = 0 ):
+    resp_org = np.array([]).reshape(100,0,10)
+    cost_so_far = 0.
+    for p in price_level:
+        conf = generate_workers(m,k,gamma,class_wise, price_setting = True, p_setting = 'fix', price = 0.02, fixp = 0.85, linear_min = 0.6, linear_max = 0.8)
+        resp_org1, workers_train_label_org, workers_val_label, workers_this_example = generate_labels_weight(fname,100,0,1,conf)
+        resp_org = np.concatenate((resp_org, resp_org1), axis = 1)
+        cost_so_far = cost_so_far + np.sum(resp_org1) * p
+    pred = majority_voting(resp_org)
+    est = [accuracy_score(pred, np.sum(resp_org[:,resp_org1.shape[1]*(i):resp_org1.shape[1]*(i+1),:],axis=1)) for i in range(len(price_level))]
+    return est, cost_so_far
+
+def redundancy(est, price_level, m, B, redundancy_level = np.arange(1,10)):
+    delta = 0.05
+    rec = dict()
+    for p, price in zip(est,price_level):
+        alpha = p
+        samples = B / price
+        for r in redundancy_level:
+            gamma = 1./((1 - 2 * alpha) * np.sqrt(samples/r))
+            #e = 2 ** 4 * gamma +  2**8*np.sqrt(m*np.log(2**6*m*delta)/(samples * r))
+            e = 0.00
+            beta = (p + e) ** r * sum([scipy.special.comb(r,u)/((p/(1-p))**u + (p/(1-p)) ** (r-u))  for u in list(np.arange(r))+[r]])
+            upp_bound = np.sqrt(r)/((1 - 2 * beta) * np.sqrt(samples))
+            rec[(p,r)] = upp_bound
+    print rec
+    (r, p) = min(rec, key = rec.get)
+    return r, p

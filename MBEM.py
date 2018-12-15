@@ -5,6 +5,9 @@ import logging,os
 import copy
 import urllib
 import logging,os,sys
+import matplotlib
+matplotlib.use('Agg')
+
 from scipy import stats
 from random import shuffle
 
@@ -40,6 +43,8 @@ gpus = None #'0,1,2,3' # if there are no gpus available set it to None.
 # k is the number of classification classes, 
 # epochs is the number of epochs for ResNet model
 m, gamma, class_wise, epochs, depth  = 100, 0.2, 0, 60, 20
+
+price_levels = np.arange(0.02, 0.25, 0.01)
 
 #### main function ####    
 def main(fname,n,n1,k,conf,samples,repeat,epochs,depth,gpus):    
@@ -140,7 +145,7 @@ def call_train_core(n,samples,k,workers_train_label_use_core,workers_val_label,f
 
 
 # calling  function to generate confusion matrices of workers
-conf = generate_workers(m,k,gamma,class_wise)  
+conf = generate_workers(m,k,gamma,class_wise, price_setting = True, p_setting = 'fix', price = 0.02, fixp = 0.85, linear_min = 0.6, linear_max = 0.8)  
 
 # calling the main function that takes as input the following:
 # name of .rec iterators and .lst files that to operate on,
@@ -164,8 +169,54 @@ for repeat,samples in [[10,5000],[7,7000],[6,8000],[5,10000],[4,12500],[3,17000]
     wmv_his.append(wmv_acc)
     mbem_acc.append(mbem_acc)
 
-plt.plot([1,2,3,4,5,6,7,10],mv_his[::-1], label = 'mv')
-plt.plot([1,2,3,4,5,6,7,10],wmv_his[::-1], label = 'wmv')
-plt.plot([1,2,3,4,5,6,7,10],mbem_his[::-1], label = 'mbmv')
-plt.legend()
-plt.savefig()
+B = 2000
+
+for setting in ['fix', 'concave', 'asymptotic', 'linear']:
+    est, B_ini = estimate(price_levels, setting)
+    r,p = redundancy(est, price_levels, m, B, redundancy_level = np.arange(1,10))
+    conf = generate_workers(m,k,gamma,class_wise, price_setting = True, p_setting = setting, price = p, fixp = 0.85, linear_min = 0.6, linear_max = 0.8)  
+    print('Infered Strategy')
+    samples = floor(B / p / r)
+    mv_acc_i, wmv_acc_i, mbem_acc_i = main(fname,n,n1,k,conf,samples,r,epochs,depth,gpus)
+
+    min_p = min(price)
+    conf = generate_workers(m,k,gamma,class_wise, price_setting = True, p_setting = setting, price = min_p, fixp = 0.85, linear_min = 0.6, linear_max = 0.8)  
+    print "Min Strategy"
+    mv_his = []
+    wmv_his = []
+    mbem_his = []
+    for repeat in np.arange(1,10):
+        samples = floor(B / min_p / repeat) 
+        print "\nnumber of training examples: " + str(samples) + "\t redundancy: " + str(repeat)
+        # calling the main function
+        mv_acc, wmv_acc, mbem_acc = main(fname,n,n1,k,conf,samples,repeat,epochs,depth,gpus)
+        mv_his.append(mv_acc)
+        wmv_his.append(wmv_acc)
+        mbem_acc.append(mbem_acc)
+        plt.plot([1,2,3,4,5,6,7,10],mv_his[::-1], label = 'mv')
+        plt.plot([1,2,3,4,5,6,7,10],wmv_his[::-1], label = 'wmv')
+        plt.plot([1,2,3,4,5,6,7,10],mbem_his[::-1], label = 'mbem')
+        plt.plot([1,2,3,4,5,6,7,10],[mbem_acc_i]*10, label = 'mbem_r')
+        plt.legend()
+        plt.savefig('Min_Strategy_'+setting + '.png')
+    max_p = max(price)
+    conf = generate_workers(m,k,gamma,class_wise, price_setting = True, p_setting = setting, price = max_p, fixp = 0.85, linear_min = 0.6, linear_max = 0.8)  
+    print "Max Strategy"
+    mv_his = []
+    wmv_his = []
+    mbem_his = []
+    for repeat in np.arange(1,10):
+        samples = floor(B / max_p / repeat)
+        # calling the main function
+        mv_acc, wmv_acc, mbem_acc = main(fname,n,n1,k,conf,samples,repeat,epochs,depth,gpus)
+        mv_his.append(mv_acc)
+        wmv_his.append(wmv_acc)
+        mbem_acc.append(mbem_acc)
+        plt.plot([1,2,3,4,5,6,7,10],mv_his[::-1], label = 'mv')
+        plt.plot([1,2,3,4,5,6,7,10],wmv_his[::-1], label = 'wmv')
+        plt.plot([1,2,3,4,5,6,7,10],mbem_his[::-1], label = 'mbmv')
+        plt.plot([1,2,3,4,5,6,7,10],[mbem_acc_i]*10, label = 'mbem_r')
+        plt.legend()
+        plt.savefig('Max_Strategy_' + setting + '.png')
+
+
