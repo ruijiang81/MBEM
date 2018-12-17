@@ -45,7 +45,7 @@ def generate_workers(m,k,gamma,class_wise, price_setting = False, p_setting = 'f
                 #conf[i] = np.identity(k)
                 #drop prob of perfect worker a little  
                 if price_setting:
-                    conf[i] = conf[i]+np.identity(k) * (1/float(K) - accuracy)/(accuracy - 1) 
+                    conf[i] = conf[i]+np.identity(k) * (1/float(k) - accuracy)/(accuracy - 1) 
                     conf[i] = np.divide(conf[i],np.outer(np.sum(conf[i],axis =1),np.ones(k)))
                 else:    
                     conf[i] = conf[i]+np.identity(k) 
@@ -192,7 +192,7 @@ def post_prob_DS(resp_org,e_class,workers_this_example):
         e_class[i] = temp_class[i]           
     return e_class
 
-def estimate(price_level, setting, B, m = 10, k = 10, gamma = 1, classwise = 0 ):
+def estimate(price_level, setting, m = 10, k = 10, gamma = 1, class_wise = 0 ):
     resp_org = np.array([]).reshape(100,0,10)
     cost_so_far = 0.
     for p in price_level:
