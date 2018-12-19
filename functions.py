@@ -4,10 +4,13 @@ import numpy as np
 import logging,os
 import copy
 import urllib
+import scipy
+
 from scipy import special
 import logging,os,sys
 from scipy import stats
 from random import shuffle
+from sklearn.metrics import accuracy_score
 
 def price_accuracy(price, setting, fixp = 0.85, linear_min = 0.6, linear_max = 0.8):
     # generate underlying probability under various price setting
@@ -192,7 +195,7 @@ def post_prob_DS(resp_org,e_class,workers_this_example):
         e_class[i] = temp_class[i]           
     return e_class
 
-def estimate(price_level, setting, m = 10, k = 10, gamma = 1, class_wise = 0 ):
+def estimate(price_level, setting, fname, m = 10, k = 10, gamma = 1, class_wise = 0 ):
     resp_org = np.array([]).reshape(100,0,10)
     cost_so_far = 0.
     for p in price_level:
@@ -216,7 +219,6 @@ def redundancy(est, price_level, m, B, redundancy_level = np.arange(1,10)):
             e = 0.00
             beta = (p + e) ** r * sum([scipy.special.comb(r,u)/((p/(1-p))**u + (p/(1-p)) ** (r-u))  for u in list(np.arange(r))+[r]])
             upp_bound = np.sqrt(r)/((1 - 2 * beta) * np.sqrt(samples))
-            rec[(p,r)] = upp_bound
-    print rec
-    (r, p) = min(rec, key = rec.get)
-    return r, p
+            rec[(price,r)] = upp_bound
+    (r, price) = min(rec, key = rec.get)
+    return r, price
