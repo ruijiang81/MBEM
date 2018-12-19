@@ -220,5 +220,5 @@ def redundancy(est, price_level, m, B, redundancy_level = np.arange(1,10)):
             beta = (p + e) ** r * sum([scipy.special.comb(r,u)/((p/(1-p))**u + (p/(1-p)) ** (r-u))  for u in list(np.arange(r))+[r]])
             upp_bound = np.sqrt(r)/((1 - 2 * beta) * np.sqrt(samples))
             rec[(price,r)] = upp_bound
-    (r, price) = min(rec, key = rec.get)
+    (price,r) = min(rec, key = rec.get)
     return r, price

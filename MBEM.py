@@ -7,7 +7,9 @@ import urllib
 import logging,os,sys
 import matplotlib
 matplotlib.use('Agg')
+import scipy
 
+from math import floor
 from scipy import stats
 from random import shuffle
 
@@ -42,17 +44,16 @@ gpus = None #'0,1,2,3' # if there are no gpus available set it to None.
 # and 0 if workers are hammer-spammer
 # k is the number of classification classes, 
 # epochs is the number of epochs for ResNet model
-m, gamma, class_wise, epochs, depth  = 100, 0.2, 0, 60, 20
+m, gamma, class_wise, epochs, depth  = 100, 1, 0, 60, 20
 
 price_levels = np.arange(0.02, 0.25, 0.01)
 
 #### main function ####    
 def main(fname,n,n1,k,conf,samples,repeat,epochs,depth,gpus):    
     # defining the range of samples that are to be used for training the model
-    valid = np.arange(0,samples)
+    valid = np.arange(0,samples,dtype='int64')
     # declaring the other samples to be invalid 
-    invalid = np.arange(samples,n)
-
+    invalid = np.arange(samples,n,dtype='int64')
     # calling function generate_labels_weight which generates noisy labels given the true labels 
     # the true lables of the examples are ascertained from the .lst files 
     # it takes as input the following:
@@ -125,11 +126,11 @@ def call_train(n,samples,k,workers_train_label_use,workers_val_label,fname,epoch
     
     # first training of the model using the given aggregated labels 
     workers_train_label_use_core = np.zeros((n,k))
-    workers_train_label_use_core[np.arange(samples)] = workers_train_label_use        
+    workers_train_label_use_core[np.arange(samples,dtype=np.int)] = workers_train_label_use        
     pred_first_iter, val_acc = call_train_core(n,samples,k,workers_train_label_use_core,workers_val_label,fname,epochs,depth,gpus)
     # second training of the model using the model prediction on the training examples based on the first training.
     workers_train_label_use_core = np.zeros((n,k))
-    workers_train_label_use_core[np.arange(samples)] = pred_first_iter[np.arange(samples)]
+    workers_train_label_use_core[np.arange(samples,dtype=np.int)] = pred_first_iter[np.arange(samples)]
     pred_second_iter, val_acc = call_train_core(n,samples,k,workers_train_label_use_core,workers_val_label,fname,epochs,depth,gpus)
     return pred_second_iter, val_acc
     
@@ -140,7 +141,7 @@ def call_train_core(n,samples,k,workers_train_label_use_core,workers_val_label,f
     workers_train_label['softmax0_label'] = workers_train_label_use_core  
     prediction, val_acc = train(gpus,fname,workers_train_label,workers_val_label,numepoch=epochs,batch_size=500,depth = depth,lr=0.5)
     model_pred = np.zeros((n,k))
-    model_pred[np.arange(samples), np.argmax(prediction[0:samples],1)] = 1
+    model_pred[np.arange(samples,dtype=np.int), np.argmax(prediction[0:samples],1)] = 1
     return model_pred, val_acc 
 
 
@@ -169,15 +170,16 @@ def call_train_core(n,samples,k,workers_train_label_use_core,workers_val_label,f
 #    wmv_his.append(wmv_acc)
 #    mbem_acc.append(mbem_acc)
 
-B = 2000
+B = 1000
 K=10
 
 for setting in ['fix', 'concave', 'asymptotic', 'linear']:
-    est, B_ini = estimate(price_levels, setting)
+    est, B_ini = estimate(price_levels, setting, fname)
     r,p = redundancy(est, price_levels, m, B, redundancy_level = np.arange(1,5))
+    r = int(r)
     conf = generate_workers(m,k,gamma,class_wise, price_setting = True, p_setting = setting, price = p, fixp = 0.85, linear_min = 0.6, linear_max = 0.8)  
     print('Infered Strategy')
-    samples = floor(B / p / r)
+    samples = int(floor(B*1. / p / r))
     mv_acc_i, wmv_acc_i, mbem_acc_i = main(fname,n,n1,k,conf,samples,r,epochs,depth,gpus)
 
     min_p = min(price)
