@@ -16,12 +16,12 @@ def price_accuracy(price, setting, fixp = 0.85, linear_min = 0.6, linear_max = 0
     # generate underlying probability under various price setting
     # Fix, Concave, Aysmptotic, Linear, Ceiling
     setting = setting.lower()
-    assert setting in ['fix', 'concave', 'aysmptotic', 'linear', 'ceiling'], "unknown setting"
+    assert setting in ['fix', 'concave', 'asymptotic', 'linear', 'ceiling'], "unknown setting"
     if setting == 'fix':
         return fixp
     if setting == 'concave':
         return 0.48 + 0.066 * (100 * price) - 0.0022 * (100 * price) ** 2
-    if setting == 'aysmptotic':
+    if setting == 'asymptotic':
         return 1 - 1./(100 * price)
     if setting == 'linear':
         return (linear_max - linear_min)/(0.25 - 0.02) * price  + (linear_min - 0.02 * (linear_max - linear_min)/(0.25 - 0.02))
