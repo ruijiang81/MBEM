@@ -12,6 +12,66 @@ from scipy import stats
 from random import shuffle
 from sklearn.metrics import accuracy_score
 
+import random
+
+class eps_greedy():
+  def __init__(self, epsilon):
+    self.epsilon = epsilon
+    self.t = 0
+    #self.counts = counts
+    #self.values = values
+    return
+
+  def initialize(self, n_arms):
+    self.counts = [0 for col in range(n_arms)]
+    self.values = [0.0 for col in range(n_arms)]
+    return
+
+  def select_arm(self):
+    if np.random.uniform(0,1) > self.epsilon and max(self.values) > 0:
+      return np.argmax(self.values)
+    else:
+      return random.randrange(len(self.values))
+
+  def update(self, chosen_arm, reward):
+    self.counts[chosen_arm] = self.counts[chosen_arm] + 1
+    n = self.counts[chosen_arm]
+
+    value = self.values[chosen_arm]
+    new_value = ((n - 1) / float(n)) * value + (1 / float(n)) * reward
+    self.values[chosen_arm] = new_value
+    return
+
+class eps_decay_greedy():
+  def __init__(self, epsilon):
+    self.epsilon = epsilon
+    self.t = 0
+    #self.counts = counts
+    #self.values = values
+    return
+
+  def initialize(self, n_arms):
+    self.n_arms = n_arms
+    self.counts = [0 for col in range(n_arms)]
+    self.values = [0.0 for col in range(n_arms)]
+    return
+
+  def select_arm(self):
+    if np.random.uniform(0,1) > 1./(1 + self.t/self.n_arms) and max(self.values) > 0:
+      return np.argmax(self.values)
+    else:
+      return random.randrange(len(self.values))
+
+  def update(self, chosen_arm, reward):
+    self.t = self.t + 1
+    self.counts[chosen_arm] = self.counts[chosen_arm] + 1
+    n = self.counts[chosen_arm]
+
+    value = self.values[chosen_arm]
+    new_value = ((n - 1) / float(n)) * value + (1 / float(n)) * reward
+    self.values[chosen_arm] = new_value
+    return
+
 def price_accuracy(price, setting, fixp = 0.85, linear_min = 0.6, linear_max = 0.8):
     # generate underlying probability under various price setting
     # Fix, Concave, Aysmptotic, Linear, Ceiling
